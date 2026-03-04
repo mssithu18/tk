@@ -1,46 +1,54 @@
 # ==========================================
-# CROSS-PLATFORM ENTERPRISE TOOLKIT
+# UNIVERSAL ENTERPRISE TOOLKIT
+# Compatible: Windows PowerShell 5.1 + PowerShell 7+
 # Author: Sithu M S
-# Compatible: Windows / Linux / macOS
-# Requires: PowerShell 7+
 # ==========================================
+
+# Detect OS (works in old & new PowerShell)
+$IsWindowsOS = $env:OS -eq "Windows_NT"
 
 function Get-SystemInfo {
 
-    Write-Host "========== SYSTEM INFORMATION =========="
+    Write-Host "`n========== SYSTEM INFORMATION =========="
 
-    if ($IsWindows) {
-        $cpu = Get-CimInstance Win32_Processor
-        $ram = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
-        $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+    if ($IsWindowsOS) {
+
+        $cpu  = Get-WmiObject Win32_Processor
+        $ram  = (Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+        $disk = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='C:'"
 
         Write-Host "OS        : Windows"
         Write-Host "CPU       : $($cpu.Name)"
         Write-Host "Cores     : $($cpu.NumberOfCores)"
         Write-Host "RAM (GB)  : $([math]::Round($ram,2))"
         Write-Host "Disk (GB) : $([math]::Round($disk.Size / 1GB,2))"
+        Write-Host "Username  : $env:USERNAME"
     }
     else {
+
         Write-Host "OS        : Linux/macOS"
-        Write-Host "CPU       : $(lscpu | grep 'Model name')"
-        Write-Host "RAM       : $(free -h | grep Mem)"
-        Write-Host "Disk      : $(df -h / | tail -1)"
+        Write-Host "Username  : $env:USER"
+        Write-Host "Use native Linux tools for detailed info."
     }
 
-    Write-Host "Username  : $env:USER"
     Write-Host "========================================="
 }
 
 function Get-NetworkInfo {
 
-    Write-Host "========== NETWORK INFORMATION =========="
+    Write-Host "`n========== NETWORK INFORMATION =========="
 
-    if ($IsWindows) {
-        $net = Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike "127*"}
-        Write-Host "IP Address : $($net.IPAddress)"
+    if ($IsWindowsOS) {
+
+        $ip = Get-WmiObject Win32_NetworkAdapterConfiguration |
+              Where-Object { $_.IPEnabled -eq $true } |
+              Select-Object -First 1
+
+        Write-Host "IP Address : $($ip.IPAddress[0])"
+        Write-Host "MAC        : $($ip.MACAddress)"
     }
     else {
-        Write-Host "IP Address : $(hostname -I)"
+        Write-Host "Use: ip a"
     }
 
     Write-Host "=========================================="
@@ -48,25 +56,25 @@ function Get-NetworkInfo {
 
 function Get-HardwareTier {
 
-    Write-Host "========== PERFORMANCE CLASSIFICATION =========="
+    Write-Host "`n========== PERFORMANCE CLASSIFICATION =========="
 
-    if ($IsWindows) {
-        $ram = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
-        $cores = (Get-CimInstance Win32_Processor).NumberOfCores
+    if ($IsWindowsOS) {
+
+        $ram   = (Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+        $cores = (Get-WmiObject Win32_Processor).NumberOfCores
+
+        if ($ram -le 4 -or $cores -le 2) {
+            Write-Host "LOW PERFORMANCE SYSTEM"
+        }
+        elseif ($ram -le 8 -or $cores -le 4) {
+            Write-Host "MID RANGE SYSTEM"
+        }
+        else {
+            Write-Host "HIGH PERFORMANCE SYSTEM"
+        }
     }
     else {
-        $ram = (free -g | awk '/Mem:/ {print $2}')
-        $cores = (nproc)
-    }
-
-    if ($ram -le 4 -or $cores -le 2) {
-        Write-Host "LOW PERFORMANCE SYSTEM"
-    }
-    elseif ($ram -le 8 -or $cores -le 4) {
-        Write-Host "MID RANGE SYSTEM"
-    }
-    else {
-        Write-Host "HIGH PERFORMANCE SYSTEM"
+        Write-Host "Hardware classification available on Windows only."
     }
 
     Write-Host "==============================================="
@@ -76,17 +84,23 @@ function Install-Browser {
 
     param ($browser)
 
-    if ($IsWindows) {
-        switch ($browser) {
-            "chrome"   { winget install Google.Chrome }
-            "firefox"  { winget install Mozilla.Firefox }
-            "brave"    { winget install Brave.Brave }
+    if ($IsWindowsOS) {
+
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+
+            switch ($browser) {
+                "chrome"   { winget install -e --id Google.Chrome }
+                "firefox"  { winget install -e --id Mozilla.Firefox }
+                "brave"    { winget install -e --id Brave.Brave }
+            }
+
+        } else {
+            Write-Host "Winget not installed."
+            Write-Host "Download from Microsoft Store (App Installer)."
         }
     }
     else {
-        Write-Host "Use your distro package manager:"
-        Write-Host "Ubuntu example:"
-        Write-Host "sudo apt install firefox"
+        Write-Host "Use your Linux package manager."
     }
 }
 
@@ -113,6 +127,7 @@ do {
         "5" { Install-Browser "firefox" }
         "6" { Install-Browser "brave" }
         "0" { break }
+        default { Write-Host "Invalid selection." }
     }
 
 } while ($choice -ne "0")
