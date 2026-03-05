@@ -1,133 +1,363 @@
 # ==========================================
-# UNIVERSAL ENTERPRISE TOOLKIT
-# Compatible: Windows PowerShell 5.1 + PowerShell 7+
-# Author: Sithu M S
+# TK ENTERPRISE TOOLKIT v3
+# Author : Sithu M S
+# Supports : Windows PowerShell 5.1 / PowerShell 7+
 # ==========================================
 
-# Detect OS (works in old & new PowerShell)
-$IsWindowsOS = $env:OS -eq "Windows_NT"
-
-function Get-SystemInfo {
-
-    Write-Host "`n========== SYSTEM INFORMATION =========="
-
-    if ($IsWindowsOS) {
-
-        $cpu  = Get-WmiObject Win32_Processor
-        $ram  = (Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory / 1GB
-        $disk = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='C:'"
-
-        Write-Host "OS        : Windows"
-        Write-Host "CPU       : $($cpu.Name)"
-        Write-Host "Cores     : $($cpu.NumberOfCores)"
-        Write-Host "RAM (GB)  : $([math]::Round($ram,2))"
-        Write-Host "Disk (GB) : $([math]::Round($disk.Size / 1GB,2))"
-        Write-Host "Username  : $env:USERNAME"
-    }
-    else {
-
-        Write-Host "OS        : Linux/macOS"
-        Write-Host "Username  : $env:USER"
-        Write-Host "Use native Linux tools for detailed info."
-    }
-
-    Write-Host "========================================="
+function Banner {
+Clear-Host
+Write-Host "========================================="
+Write-Host "        TK ENTERPRISE TOOLKIT v3         "
+Write-Host "========================================="
 }
 
-function Get-NetworkInfo {
+# -------------------------
+# SYSTEM INFO
+# -------------------------
 
-    Write-Host "`n========== NETWORK INFORMATION =========="
+function System-Info {
 
-    if ($IsWindowsOS) {
+Write-Host "===== SYSTEM INFO ====="
 
-        $ip = Get-WmiObject Win32_NetworkAdapterConfiguration |
-              Where-Object { $_.IPEnabled -eq $true } |
-              Select-Object -First 1
+$os = Get-CimInstance Win32_OperatingSystem
+$cpu = Get-CimInstance Win32_Processor
+$ram = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory /1GB
 
-        Write-Host "IP Address : $($ip.IPAddress[0])"
-        Write-Host "MAC        : $($ip.MACAddress)"
-    }
-    else {
-        Write-Host "Use: ip a"
-    }
+Write-Host "OS :" $os.Caption
+Write-Host "CPU :" $cpu.Name
+Write-Host "Cores :" $cpu.NumberOfCores
+Write-Host "RAM :" ([math]::Round($ram,2)) "GB"
 
-    Write-Host "=========================================="
 }
 
-function Get-HardwareTier {
+# -------------------------
+# DASHBOARD
+# -------------------------
 
-    Write-Host "`n========== PERFORMANCE CLASSIFICATION =========="
+function Dashboard {
 
-    if ($IsWindowsOS) {
+$cpu = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
 
-        $ram   = (Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory / 1GB
-        $cores = (Get-WmiObject Win32_Processor).NumberOfCores
+$ram = Get-CimInstance Win32_OperatingSystem
+$total = $ram.TotalVisibleMemorySize
+$free = $ram.FreePhysicalMemory
+$ramPercent = [math]::Round((($total-$free)/$total)*100)
 
-        if ($ram -le 4 -or $cores -le 2) {
-            Write-Host "LOW PERFORMANCE SYSTEM"
-        }
-        elseif ($ram -le 8 -or $cores -le 4) {
-            Write-Host "MID RANGE SYSTEM"
-        }
-        else {
-            Write-Host "HIGH PERFORMANCE SYSTEM"
-        }
-    }
-    else {
-        Write-Host "Hardware classification available on Windows only."
-    }
+Write-Host "CPU :" ([math]::Round($cpu)) "%"
+Write-Host "RAM :" $ramPercent "%"
 
-    Write-Host "==============================================="
 }
 
-function Install-Browser {
+# -------------------------
+# LIVE MONITOR
+# -------------------------
 
-    param ($browser)
+function Live-Monitor {
 
-    if ($IsWindowsOS) {
+while ($true){
 
-        if (Get-Command winget -ErrorAction SilentlyContinue) {
+Clear-Host
 
-            switch ($browser) {
-                "chrome"   { winget install -e --id Google.Chrome }
-                "firefox"  { winget install -e --id Mozilla.Firefox }
-                "brave"    { winget install -e --id Brave.Brave }
-            }
+$cpu = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
 
-        } else {
-            Write-Host "Winget not installed."
-            Write-Host "Download from Microsoft Store (App Installer)."
-        }
-    }
-    else {
-        Write-Host "Use your Linux package manager."
-    }
+$ram = Get-CimInstance Win32_OperatingSystem
+$total = $ram.TotalVisibleMemorySize
+$free = $ram.FreePhysicalMemory
+$ramPercent = [math]::Round((($total-$free)/$total)*100)
+
+Write-Host "CPU :" ([math]::Round($cpu)) "%"
+Write-Host "RAM :" $ramPercent "%"
+
+Start-Sleep 2
+
 }
 
+}
+
+# -------------------------
+# INTERNET TEST
+# -------------------------
+
+function Ping-Test {
+
+Test-Connection 8.8.8.8 -Count 4
+
+}
+
+# -------------------------
+# NETWORK INFO
+# -------------------------
+
+function Network-Info {
+
+ipconfig /all
+
+}
+
+function Active-Connections {
+
+netstat -ano
+
+}
+
+function Network-Adapters {
+
+Get-NetAdapter
+
+}
+
+# -------------------------
+# DISK TOOLS
+# -------------------------
+
+function Disk-Health {
+
+Get-PhysicalDisk | Select FriendlyName,HealthStatus
+
+}
+
+function Disk-Usage {
+
+Get-PSDrive
+
+}
+
+# -------------------------
+# LICENSE CHECKS
+# -------------------------
+
+function Windows-License {
+
+$lic = Get-CimInstance SoftwareLicensingProduct |
+Where-Object {$_.PartialProductKey}
+
+if ($lic.LicenseStatus -eq 1){
+Write-Host "Windows Activated"
+}
+else{
+Write-Host "Windows NOT Activated"
+}
+
+}
+
+function Office-License {
+
+$path = "C:\Program Files\Microsoft Office\Office16\OSPP.VBS"
+
+if(Test-Path $path){
+
+cscript $path /dstatus
+
+}else{
+
+Write-Host "Office not detected"
+
+}
+
+}
+
+# -------------------------
+# ADMIN UTILITIES
+# -------------------------
+
+function Restart-Explorer {
+
+Stop-Process explorer -Force
+Start-Process explorer
+
+}
+
+function Reset-Password {
+
+$user = Read-Host "Username"
+$pass = Read-Host "Password"
+
+net user $user $pass
+
+}
+
+function Drivers {
+
+driverquery
+
+}
+
+function Installed-Software {
+
+Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
+Select DisplayName
+
+}
+
+function Running-Processes {
+
+Get-Process
+
+}
+
+function Services {
+
+Get-Service
+
+}
+
+function Firewall-Status {
+
+Get-NetFirewallProfile
+
+}
+
+function Windows-Updates {
+
+Get-HotFix
+
+}
+
+function Startup-Programs {
+
+Get-CimInstance Win32_StartupCommand
+
+}
+
+function System-Uptime {
+
+(get-date) - (gcim Win32_OperatingSystem).LastBootUpTime
+
+}
+
+# -------------------------
+# AUTO SOFTWARE INSTALLER
+# -------------------------
+
+function Install-Chrome {
+
+winget install Google.Chrome
+
+}
+
+function Install-Firefox {
+
+winget install Mozilla.Firefox
+
+}
+
+function Install-Brave {
+
+winget install Brave.Brave
+
+}
+
+function Install-VSCode {
+
+winget install Microsoft.VisualStudioCode
+
+}
+
+function Install-Git {
+
+winget install Git.Git
+
+}
+
+function Install-Node {
+
+winget install OpenJS.NodeJS
+
+}
+
+function Install-Docker {
+
+winget install Docker.DockerDesktop
+
+}
+
+function Install-All {
+
+Install-Chrome
+Install-Firefox
+Install-Brave
+Install-VSCode
+Install-Git
+Install-Node
+Install-Docker
+
+}
+
+# -------------------------
 # MENU
+# -------------------------
+
 do {
-    Write-Host ""
-    Write-Host "========== ENTERPRISE TOOLKIT =========="
-    Write-Host "1. System Info"
-    Write-Host "2. Network Info"
-    Write-Host "3. Performance Classification"
-    Write-Host "4. Install Chrome"
-    Write-Host "5. Install Firefox"
-    Write-Host "6. Install Brave"
-    Write-Host "0. Exit"
-    Write-Host "========================================"
 
-    $choice = Read-Host "Select Option"
+Banner
 
-    switch ($choice) {
-        "1" { Get-SystemInfo }
-        "2" { Get-NetworkInfo }
-        "3" { Get-HardwareTier }
-        "4" { Install-Browser "chrome" }
-        "5" { Install-Browser "firefox" }
-        "6" { Install-Browser "brave" }
-        "0" { break }
-        default { Write-Host "Invalid selection." }
-    }
+Write-Host "1  System Info"
+Write-Host "2  Dashboard"
+Write-Host "3  Live CPU/RAM Monitor"
+Write-Host "4  Ping Internet"
+Write-Host "5  Network Info"
+Write-Host "6  Active Connections"
+Write-Host "7  Network Adapters"
+Write-Host "8  Disk Health"
+Write-Host "9  Disk Usage"
+Write-Host "10 Windows License"
+Write-Host "11 Office License"
+Write-Host "12 Running Processes"
+Write-Host "13 Services"
+Write-Host "14 Drivers"
+Write-Host "15 Installed Software"
+Write-Host "16 Firewall Status"
+Write-Host "17 Windows Updates"
+Write-Host "18 Startup Programs"
+Write-Host "19 System Uptime"
+Write-Host "20 Restart Explorer"
+Write-Host "21 Reset User Password"
+Write-Host "22 Install Chrome"
+Write-Host "23 Install Firefox"
+Write-Host "24 Install Brave"
+Write-Host "25 Install VS Code"
+Write-Host "26 Install Git"
+Write-Host "27 Install NodeJS"
+Write-Host "28 Install Docker"
+Write-Host "29 Install ALL Software"
+Write-Host "0  Exit"
+
+$choice = Read-Host "Select Option"
+
+switch ($choice) {
+
+"1" {System-Info}
+"2" {Dashboard}
+"3" {Live-Monitor}
+"4" {Ping-Test}
+"5" {Network-Info}
+"6" {Active-Connections}
+"7" {Network-Adapters}
+"8" {Disk-Health}
+"9" {Disk-Usage}
+"10" {Windows-License}
+"11" {Office-License}
+"12" {Running-Processes}
+"13" {Services}
+"14" {Drivers}
+"15" {Installed-Software}
+"16" {Firewall-Status}
+"17" {Windows-Updates}
+"18" {Startup-Programs}
+"19" {System-Uptime}
+"20" {Restart-Explorer}
+"21" {Reset-Password}
+"22" {Install-Chrome}
+"23" {Install-Firefox}
+"24" {Install-Brave}
+"25" {Install-VSCode}
+"26" {Install-Git}
+"27" {Install-Node}
+"28" {Install-Docker}
+"29" {Install-All}
+
+}
+
+pause
 
 } while ($choice -ne "0")
