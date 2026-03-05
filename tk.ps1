@@ -1,27 +1,48 @@
-# ==========================================
-# TK ENTERPRISE TOOLKIT v3
-# Author : Sithu M S
-# Supports : Windows PowerShell 5.1 / PowerShell 7+
-# ==========================================
+# =========================================
+# TK ADMIN TOOLKIT
+# Author: Sithu M S
+# Cross Platform: Windows / Linux / macOS
+# =========================================
+
+Clear-Host
+
+# ----------------------------
+# Detect OS
+# ----------------------------
+
+if ($IsWindows) { $OS="Windows" }
+elseif ($IsLinux) { $OS="Linux" }
+elseif ($IsMacOS) { $OS="macOS" }
+else { $OS="Unknown" }
+
+# ----------------------------
+# Banner
+# ----------------------------
 
 function Banner {
-Clear-Host
-Write-Host "========================================="
-Write-Host "        TK ENTERPRISE TOOLKIT v3         "
-Write-Host "========================================="
+
+Write-Host ""
+Write-Host "===================================="
+Write-Host "        TK ADMIN TOOLKIT"
+Write-Host "===================================="
+Write-Host "OS Detected : $OS"
+Write-Host ""
+
 }
 
-# -------------------------
+# ----------------------------
 # SYSTEM INFO
-# -------------------------
+# ----------------------------
 
-function System-Info {
+function SystemInfo {
 
-Write-Host "===== SYSTEM INFO ====="
+Write-Host "===== SYSTEM INFORMATION ====="
+
+if ($IsWindows){
 
 $os = Get-CimInstance Win32_OperatingSystem
 $cpu = Get-CimInstance Win32_Processor
-$ram = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory /1GB
+$ram = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB
 
 Write-Host "OS :" $os.Caption
 Write-Host "CPU :" $cpu.Name
@@ -30,33 +51,34 @@ Write-Host "RAM :" ([math]::Round($ram,2)) "GB"
 
 }
 
-# -------------------------
-# DASHBOARD
-# -------------------------
+elseif ($IsLinux){
 
-function Dashboard {
-
-$cpu = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
-
-$ram = Get-CimInstance Win32_OperatingSystem
-$total = $ram.TotalVisibleMemorySize
-$free = $ram.FreePhysicalMemory
-$ramPercent = [math]::Round((($total-$free)/$total)*100)
-
-Write-Host "CPU :" ([math]::Round($cpu)) "%"
-Write-Host "RAM :" $ramPercent "%"
+uname -a
+lscpu
+free -h
+df -h
 
 }
 
-# -------------------------
-# LIVE MONITOR
-# -------------------------
+elseif ($IsMacOS){
 
-function Live-Monitor {
+system_profiler SPHardwareDataType
 
-while ($true){
+}
+
+}
+
+# ----------------------------
+# DASHBOARD
+# ----------------------------
+
+function Dashboard {
 
 Clear-Host
+
+Write-Host "======= SYSTEM DASHBOARD ======="
+
+if ($IsWindows){
 
 $cpu = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
 
@@ -65,84 +87,123 @@ $total = $ram.TotalVisibleMemorySize
 $free = $ram.FreePhysicalMemory
 $ramPercent = [math]::Round((($total-$free)/$total)*100)
 
-Write-Host "CPU :" ([math]::Round($cpu)) "%"
-Write-Host "RAM :" $ramPercent "%"
+Write-Host "CPU Usage :" ([math]::Round($cpu)) "%"
+Write-Host "RAM Usage :" $ramPercent "%"
 
+}
+
+else {
+
+top -n 1 | head -5
+
+}
+
+}
+
+# ----------------------------
+# LIVE MONITOR
+# ----------------------------
+
+function LiveMonitor {
+
+while ($true){
+
+Dashboard
 Start-Sleep 2
 
 }
 
 }
 
-# -------------------------
-# INTERNET TEST
-# -------------------------
+# ----------------------------
+# NETWORK TOOLS
+# ----------------------------
 
-function Ping-Test {
+function PingTest {
 
-Test-Connection 8.8.8.8 -Count 4
-
-}
-
-# -------------------------
-# NETWORK INFO
-# -------------------------
-
-function Network-Info {
-
-ipconfig /all
+ping 8.8.8.8
 
 }
 
-function Active-Connections {
+function NetworkInfo {
 
-netstat -ano
-
-}
-
-function Network-Adapters {
-
-Get-NetAdapter
+if ($IsWindows){ ipconfig /all }
+elseif ($IsLinux){ ip a }
+elseif ($IsMacOS){ ifconfig }
 
 }
 
-# -------------------------
+function ActiveConnections {
+
+netstat -an
+
+}
+
+function NetworkAdapters {
+
+if ($IsWindows){ Get-NetAdapter }
+else{ ip link }
+
+}
+
+# ----------------------------
 # DISK TOOLS
-# -------------------------
+# ----------------------------
 
-function Disk-Health {
+function DiskHealth {
+
+if ($IsWindows){
 
 Get-PhysicalDisk | Select FriendlyName,HealthStatus
 
 }
 
-function Disk-Usage {
+else{
+
+df -h
+
+}
+
+}
+
+function DiskUsage {
 
 Get-PSDrive
 
 }
 
-# -------------------------
-# LICENSE CHECKS
-# -------------------------
+# ----------------------------
+# SECURITY / LICENSE
+# ----------------------------
 
-function Windows-License {
+function WindowsLicense {
+
+if ($IsWindows){
 
 $lic = Get-CimInstance SoftwareLicensingProduct |
 Where-Object {$_.PartialProductKey}
 
 if ($lic.LicenseStatus -eq 1){
+
 Write-Host "Windows Activated"
-}
-else{
+
+}else{
+
 Write-Host "Windows NOT Activated"
+
+}
+
+}else{
+
+Write-Host "Not Windows"
+
 }
 
 }
 
-function Office-License {
+function OfficeLicense {
 
-$path = "C:\Program Files\Microsoft Office\Office16\OSPP.VBS"
+$path="C:\Program Files\Microsoft Office\Office16\OSPP.VBS"
 
 if(Test-Path $path){
 
@@ -150,142 +211,184 @@ cscript $path /dstatus
 
 }else{
 
-Write-Host "Office not detected"
+Write-Host "Office Not Found"
 
 }
 
 }
 
-# -------------------------
-# ADMIN UTILITIES
-# -------------------------
+# ----------------------------
+# ADMIN TOOLS
+# ----------------------------
 
-function Restart-Explorer {
+function RunningProcesses { Get-Process }
 
-Stop-Process explorer -Force
-Start-Process explorer
-
-}
-
-function Reset-Password {
-
-$user = Read-Host "Username"
-$pass = Read-Host "Password"
-
-net user $user $pass
-
-}
+function Services { Get-Service }
 
 function Drivers {
 
-driverquery
+if ($IsWindows){ driverquery }
 
 }
 
-function Installed-Software {
+function InstalledSoftware {
+
+if ($IsWindows){
 
 Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
 Select DisplayName
 
 }
 
-function Running-Processes {
+}
 
-Get-Process
+function FirewallStatus {
+
+if ($IsWindows){ Get-NetFirewallProfile }
 
 }
 
-function Services {
+function WindowsUpdates {
 
-Get-Service
-
-}
-
-function Firewall-Status {
-
-Get-NetFirewallProfile
+if ($IsWindows){ Get-HotFix }
 
 }
 
-function Windows-Updates {
+function StartupPrograms {
 
-Get-HotFix
-
-}
-
-function Startup-Programs {
+if ($IsWindows){
 
 Get-CimInstance Win32_StartupCommand
 
 }
 
-function System-Uptime {
+}
+
+function SystemUptime {
+
+if ($IsWindows){
 
 (get-date) - (gcim Win32_OperatingSystem).LastBootUpTime
 
 }
 
-# -------------------------
-# AUTO SOFTWARE INSTALLER
-# -------------------------
+else{
 
-function Install-Chrome {
-
-winget install Google.Chrome
+uptime
 
 }
 
-function Install-Firefox {
+}
 
-winget install Mozilla.Firefox
+function RestartExplorer {
+
+if ($IsWindows){
+
+Stop-Process explorer -Force
+Start-Process explorer
 
 }
 
-function Install-Brave {
+}
 
-winget install Brave.Brave
+function ResetPassword {
+
+if ($IsWindows){
+
+$user=Read-Host "Username"
+$pass=Read-Host "New Password"
+
+net user $user $pass
 
 }
 
-function Install-VSCode {
+}
 
-winget install Microsoft.VisualStudioCode
+# ----------------------------
+# SOFTWARE INSTALLER
+# ----------------------------
+
+function InstallChrome {
+
+if ($IsWindows){ winget install Google.Chrome }
+
+elseif ($IsLinux){ sudo apt install chromium-browser -y }
+
+elseif ($IsMacOS){ brew install google-chrome }
 
 }
 
-function Install-Git {
+function InstallFirefox {
 
-winget install Git.Git
+if ($IsWindows){ winget install Mozilla.Firefox }
 
-}
+elseif ($IsLinux){ sudo apt install firefox -y }
 
-function Install-Node {
-
-winget install OpenJS.NodeJS
+elseif ($IsMacOS){ brew install firefox }
 
 }
 
-function Install-Docker {
+function InstallBrave {
 
-winget install Docker.DockerDesktop
-
-}
-
-function Install-All {
-
-Install-Chrome
-Install-Firefox
-Install-Brave
-Install-VSCode
-Install-Git
-Install-Node
-Install-Docker
+if ($IsWindows){ winget install Brave.Brave }
 
 }
 
-# -------------------------
+function InstallVSCode {
+
+if ($IsWindows){ winget install Microsoft.VisualStudioCode }
+
+elseif ($IsLinux){ sudo snap install code --classic }
+
+elseif ($IsMacOS){ brew install --cask visual-studio-code }
+
+}
+
+function InstallGit {
+
+if ($IsWindows){ winget install Git.Git }
+
+elseif ($IsLinux){ sudo apt install git -y }
+
+elseif ($IsMacOS){ brew install git }
+
+}
+
+function InstallNode {
+
+if ($IsWindows){ winget install OpenJS.NodeJS }
+
+elseif ($IsLinux){ sudo apt install nodejs -y }
+
+elseif ($IsMacOS){ brew install node }
+
+}
+
+function InstallDocker {
+
+if ($IsWindows){ winget install Docker.DockerDesktop }
+
+elseif ($IsLinux){ sudo apt install docker.io -y }
+
+elseif ($IsMacOS){ brew install docker }
+
+}
+
+function InstallAll {
+
+InstallChrome
+InstallFirefox
+InstallBrave
+InstallVSCode
+InstallGit
+InstallNode
+InstallDocker
+
+}
+
+# ----------------------------
 # MENU
-# -------------------------
+# ----------------------------
 
 do {
 
@@ -293,8 +396,8 @@ Banner
 
 Write-Host "1  System Info"
 Write-Host "2  Dashboard"
-Write-Host "3  Live CPU/RAM Monitor"
-Write-Host "4  Ping Internet"
+Write-Host "3  Live Monitor"
+Write-Host "4  Ping Test"
 Write-Host "5  Network Info"
 Write-Host "6  Active Connections"
 Write-Host "7  Network Adapters"
@@ -324,37 +427,37 @@ Write-Host "0  Exit"
 
 $choice = Read-Host "Select Option"
 
-switch ($choice) {
+switch ($choice){
 
-"1" {System-Info}
+"1" {SystemInfo}
 "2" {Dashboard}
-"3" {Live-Monitor}
-"4" {Ping-Test}
-"5" {Network-Info}
-"6" {Active-Connections}
-"7" {Network-Adapters}
-"8" {Disk-Health}
-"9" {Disk-Usage}
-"10" {Windows-License}
-"11" {Office-License}
-"12" {Running-Processes}
+"3" {LiveMonitor}
+"4" {PingTest}
+"5" {NetworkInfo}
+"6" {ActiveConnections}
+"7" {NetworkAdapters}
+"8" {DiskHealth}
+"9" {DiskUsage}
+"10" {WindowsLicense}
+"11" {OfficeLicense}
+"12" {RunningProcesses}
 "13" {Services}
 "14" {Drivers}
-"15" {Installed-Software}
-"16" {Firewall-Status}
-"17" {Windows-Updates}
-"18" {Startup-Programs}
-"19" {System-Uptime}
-"20" {Restart-Explorer}
-"21" {Reset-Password}
-"22" {Install-Chrome}
-"23" {Install-Firefox}
-"24" {Install-Brave}
-"25" {Install-VSCode}
-"26" {Install-Git}
-"27" {Install-Node}
-"28" {Install-Docker}
-"29" {Install-All}
+"15" {InstalledSoftware}
+"16" {FirewallStatus}
+"17" {WindowsUpdates}
+"18" {StartupPrograms}
+"19" {SystemUptime}
+"20" {RestartExplorer}
+"21" {ResetPassword}
+"22" {InstallChrome}
+"23" {InstallFirefox}
+"24" {InstallBrave}
+"25" {InstallVSCode}
+"26" {InstallGit}
+"27" {InstallNode}
+"28" {InstallDocker}
+"29" {InstallAll}
 
 }
 
