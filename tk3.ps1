@@ -1,42 +1,88 @@
-# ================================
-# PowerShell Network Monitor
-# ================================
-
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Windows.Forms.DataVisualization
 
-$basePath = "$env:USERPROFILE\Documents\NetworkMonitor"
-$csv = "$basePath\data.csv"
-$html = "$basePath\dashboard.html"
+# Folder
+$folder="$env:USERPROFILE\Documents\NetworkMonitor"
+$csv="$folder\speed_log.csv"
 
-if (!(Test-Path $basePath)) {
-    New-Item -ItemType Directory $basePath | Out-Null
+if(!(Test-Path $folder)){
+New-Item -ItemType Directory $folder | Out-Null
 }
 
-if (!(Test-Path $csv)) {
-    "Date,Time,Download,Upload,Latency" | Out-File $csv
+if(!(Test-Path $csv)){
+"Time,Download,Upload,Ping" | Out-File $csv
 }
 
+# Form
+$form=New-Object Windows.Forms.Form
+$form.Text="Network Monitoring Dashboard"
+$form.Width=900
+$form.Height=500
+
+# Chart
+$chart=New-Object System.Windows.Forms.DataVisualization.Charting.Chart
+$chart.Width=850
+$chart.Height=300
+$chart.Left=20
+$chart.Top=20
+
+$chartArea=New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea
+$chart.ChartAreas.Add($chartArea)
+
+$downloadSeries=New-Object System.Windows.Forms.DataVisualization.Charting.Series
+$downloadSeries.Name="Download"
+$downloadSeries.ChartType="Line"
+
+$uploadSeries=New-Object System.Windows.Forms.DataVisualization.Charting.Series
+$uploadSeries.Name="Upload"
+$uploadSeries.ChartType="Line"
+
+$chart.Series.Add($downloadSeries)
+$chart.Series.Add($uploadSeries)
+
+$form.Controls.Add($chart)
+
+# Status Label
+$status=New-Object Windows.Forms.Label
+$status.Width=800
+$status.Height=30
+$status.Top=330
+$status.Left=40
+$form.Controls.Add($status)
+
+# Run Button
+$button=New-Object Windows.Forms.Button
+$button.Text="Run Speed Test"
+$button.Width=200
+$button.Height=40
+$button.Top=380
+$button.Left=350
+$form.Controls.Add($button)
+
+# Ping Server
 $server="8.8.8.8"
 $speedThreshold=20
 
-function Get-Speed {
+function Run-Test{
 
-    $json = speedtest -f json | ConvertFrom-Json
+$time=Get-Date -Format "HH:mm:ss"
 
-    $download=[math]::Round($json.download.bandwidth/125000,2)
-    $upload=[math]::Round($json.upload.bandwidth/125000,2)
+$json=speedtest -f json | ConvertFrom-Json
 
-    return @($download,$upload)
-}
+$download=[math]::Round($json.download.bandwidth/125000,2)
+$upload=[math]::Round($json.upload.bandwidth/125000,2)
 
-function Get-Ping {
+$ping=(Test-Connection $server -Count 4 | Measure-Object ResponseTime -Average).Average
 
-    $ping=Test-Connection $server -Count 4
-    return ($ping | Measure-Object ResponseTime -Average).Average
-}
+"$time,$download,$upload,$ping" | Add-Content $csv
 
-function Send-Alert($speed){
+$downloadSeries.Points.AddXY($time,$download)
+$uploadSeries.Points.AddXY($time,$upload)
+
+$status.Text="Download: $download Mbps | Upload: $upload Mbps | Ping: $ping ms"
+
+# Email Alert
+if($download -lt $speedThreshold){
 
 $smtp="smtp.gmail.com"
 
@@ -44,94 +90,37 @@ Send-MailMessage `
 -To "admin@email.com" `
 -From "monitor@email.com" `
 -Subject "Internet Speed Alert" `
--Body "Speed dropped to $speed Mbps" `
+-Body "Download speed dropped to $download Mbps" `
 -SmtpServer $smtp
 }
 
-function Update-HTML {
-
-$data=Import-Csv $csv | Select-Object -Last 20
-
-$htmlContent=@"
-<html>
-<head>
-<title>Network Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-
-<body>
-
-<h2>Network Speed Dashboard</h2>
-
-<canvas id="speedChart"></canvas>
-
-<script>
-
-var ctx=document.getElementById('speedChart');
-
-var chart=new Chart(ctx,{
-type:'line',
-data:{
-labels:[ $(($data.Time -join "','") -replace "^","'" -replace "$","'") ],
-datasets:[
-{
-label:'Download Mbps',
-data:[ $($data.Download -join ",") ]
-},
-{
-label:'Upload Mbps',
-data:[ $($data.Upload -join ",") ]
-}
-]
-}
-});
-
-</script>
-
-</body>
-</html>
-"@
-
-$htmlContent | Out-File $html
 }
 
-function Run-Test {
+$button.Add_Click({Run-Test})
 
-$date=Get-Date -Format "yyyy-MM-dd"
-$time=Get-Date -Format "HH:mm:ss"
+# Scheduler
+$timer=New-Object Windows.Forms.Timer
+$timer.Interval=60000
 
-$s=Get-Speed
-$d=$s[0]
-$u=$s[1]
+$timer.Add_Tick({
 
-$lat=Get-Ping
+$now=Get-Date
+$start=Get-Date -Hour 8 -Minute 45 -Second 0
+$end=Get-Date -Hour 9 -Minute 0 -Second 0
 
-"$date,$time,$d,$u,$lat" | Add-Content $csv
+if($now -ge $start -and $now -le $end){
 
-if($d -lt $speedThreshold){
-Send-Alert $d
+for($i=1;$i -le 10;$i++){
+
+Run-Test
+Start-Sleep -Seconds 90
+
 }
 
-Update-HTML
-
-Write-Host "Download:$d Upload:$u Ping:$lat"
 }
 
-# GUI
-$form=New-Object Windows.Forms.Form
-$form.Text="Network Monitor"
-$form.Width=300
-$form.Height=200
+})
 
-$btn=New-Object Windows.Forms.Button
-$btn.Text="Run Speed Test"
-$btn.Width=200
-$btn.Height=40
-$btn.Top=50
-$btn.Left=40
-
-$btn.Add_Click({Run-Test})
-
-$form.Controls.Add($btn)
+$timer.Start()
 
 $form.ShowDialog()
