@@ -1,30 +1,34 @@
-# ============================================
+# ===============================================================
 # Enterprise Terminal Toolkit v3
 # Author : mssithu18
 # Mode   : Terminal Only (No GUI)
-# ============================================
+# ===============================================================
 
 Clear-Host
+
+# ---------------------------------------------------------------
+# BANNER
+# ---------------------------------------------------------------
 
 function Show-Banner {
 
 Write-Host ""
-Write-Host "==============================================="
-Write-Host "        ENTERPRISE TERMINAL TOOLKIT v3"
-Write-Host "==============================================="
+Write-Host "================================================="
+Write-Host "         ENTERPRISE TERMINAL TOOLKIT v3"
+Write-Host "================================================="
 Write-Host ""
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # SYSTEM INFORMATION
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function System-Info {
 
 Write-Host ""
 Write-Host "SYSTEM INFORMATION"
-Write-Host "-------------------"
+Write-Host "------------------"
 
 $cpu = (Get-CimInstance Win32_Processor).Name
 $ram = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB,2)
@@ -38,36 +42,36 @@ Write-Host "Last Boot     : $boot"
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # NETWORK STATUS
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Network-Status {
 
 Write-Host ""
 Write-Host "NETWORK STATUS"
-Write-Host "---------------"
+Write-Host "--------------"
 
-Get-NetIPAddress | Where AddressFamily -eq IPv4 |
+Get-NetIPAddress |
+Where AddressFamily -eq IPv4 |
 Select InterfaceAlias,IPAddress
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # INTERNET SPEED TEST
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Internet-SpeedTest {
 
 Write-Host ""
 Write-Host "RUNNING INTERNET SPEED TEST..."
-Write-Host "------------------------------"
 
-$server = "http://speedtest.tele2.net/10MB.zip"
+$url = "http://speedtest.tele2.net/10MB.zip"
 $temp = "$env:TEMP\speedtest.tmp"
 
 $time = Measure-Command {
-Invoke-WebRequest $server -OutFile $temp -UseBasicParsing
+Invoke-WebRequest $url -OutFile $temp -UseBasicParsing
 }
 
 Remove-Item $temp -ErrorAction SilentlyContinue
@@ -79,61 +83,55 @@ Write-Host "Estimated Download Speed : $speed Mbps"
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # DISK INFORMATION
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Disk-Info {
 
 Write-Host ""
 Write-Host "DISK INFORMATION"
-Write-Host "----------------"
 
 Get-PSDrive -PSProvider FileSystem |
 Select Name,Used,Free
 
 }
 
-# ------------------------------------------------
-# RUNNING PROCESSES
-# ------------------------------------------------
+# ---------------------------------------------------------------
+# LIST RUNNING PROCESSES
+# ---------------------------------------------------------------
 
 function Process-List {
 
 Write-Host ""
 Write-Host "TOP CPU PROCESSES"
-Write-Host "------------------"
 
 Get-Process |
 Sort CPU -Descending |
-Select -First 10 Name,CPU
+Select -First 15 Name,CPU
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # NETWORK DEVICES
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Network-Devices {
 
 Write-Host ""
 Write-Host "NETWORK DEVICES"
-Write-Host "---------------"
 
 arp -a
 
 }
 
-# ------------------------------------------------
-# PORT SCAN
-# ------------------------------------------------
+# ---------------------------------------------------------------
+# PORT SCANNER
+# ---------------------------------------------------------------
 
 function Port-Scan {
 
 $hostip = Read-Host "Enter Target IP"
-
-Write-Host ""
-Write-Host "Scanning common ports..."
 
 $ports = 21,22,23,25,53,80,110,139,143,443,445,3389
 
@@ -145,72 +143,72 @@ try{
 $tcp.Connect($hostip,$p)
 Write-Host "Port $p OPEN"
 }
-catch{}
-
+catch{
+Write-Host "Port $p closed"
 }
 
 }
 
-# ------------------------------------------------
-# WINDOWS SERVICES
-# ------------------------------------------------
+}
+
+# ---------------------------------------------------------------
+# RUNNING SERVICES
+# ---------------------------------------------------------------
 
 function Running-Services {
 
 Write-Host ""
 Write-Host "RUNNING SERVICES"
-Write-Host "----------------"
 
 Get-Service |
 Where {$_.Status -eq "Running"} |
-Select -First 15 Name,DisplayName
+Select -First 20 Name,DisplayName
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # WINDOWS UPDATE CHECK
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Check-WindowsUpdate {
 
 Write-Host ""
-Write-Host "CHECKING WINDOWS UPDATE"
+Write-Host "CHECKING WINDOWS UPDATES"
 
 Install-Module PSWindowsUpdate -Force -ErrorAction SilentlyContinue
-
 Get-WindowsUpdate
 
 }
 
-# ------------------------------------------------
-# SYSTEM FILE REPAIR
-# ------------------------------------------------
+# ---------------------------------------------------------------
+# SYSTEM FILE CHECKER
+# ---------------------------------------------------------------
 
 function System-Repair {
 
 Write-Host ""
-Write-Host "Running SFC Scan..."
+Write-Host "RUNNING SFC SCAN"
 
 sfc /scannow
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # DISK REPAIR
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Disk-Repair {
 
 Write-Host ""
-Write-Host "Running CHKDSK..."
+Write-Host "RUNNING CHKDSK"
 
 chkdsk C: /scan
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # NETWORK RESET
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Network-Reset {
 
@@ -222,23 +220,23 @@ netsh winsock reset
 
 }
 
-# ------------------------------------------------
-# INSTALLED PROGRAMS
-# ------------------------------------------------
+# ---------------------------------------------------------------
+# INSTALLED SOFTWARE
+# ---------------------------------------------------------------
 
 function Installed-Programs {
 
 Write-Host ""
-Write-Host "INSTALLED SOFTWARE"
+Write-Host "INSTALLED PROGRAMS"
 
 Get-WmiObject Win32_Product |
 Select Name
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # SOFTWARE INSTALLER
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function Install-Tools {
 
@@ -248,9 +246,9 @@ Write-Host "2 - VS Code"
 Write-Host "3 - 7zip"
 Write-Host "4 - Git"
 
-$ch = Read-Host "Select"
+$choice = Read-Host "Select software"
 
-switch($ch){
+switch($choice){
 
 1 { winget install Google.Chrome }
 
@@ -264,14 +262,11 @@ switch($ch){
 
 }
 
-# ------------------------------------------------
+# ---------------------------------------------------------------
 # CPU MONITOR
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 function CPU-Monitor {
-
-Write-Host ""
-Write-Host "CPU LIVE MONITOR"
 
 while($true){
 
@@ -286,18 +281,16 @@ Start-Sleep 2
 
 }
 
-# ------------------------------------------------
-# MEMORY MONITOR
-# ------------------------------------------------
+# ---------------------------------------------------------------
+# RAM MONITOR
+# ---------------------------------------------------------------
 
 function RAM-Monitor {
-
-Write-Host ""
-Write-Host "RAM LIVE MONITOR"
 
 while($true){
 
 $ram = Get-Counter '\Memory\Available MBytes'
+
 Write-Host "Available RAM : $($ram.CounterSamples.CookedValue) MB"
 
 Start-Sleep 2
@@ -306,28 +299,147 @@ Start-Sleep 2
 
 }
 
-# ------------------------------------------------
-# NETWORK PING TEST
-# ------------------------------------------------
+# ---------------------------------------------------------------
+# PING TEST
+# ---------------------------------------------------------------
 
 function Ping-Test {
 
-$host = Read-Host "Enter Host"
+$host = Read-Host "Enter host"
 
 ping $host
 
 }
 
-# ------------------------------------------------
-# MENU
-# ------------------------------------------------
+# ---------------------------------------------------------------
+# PUBLIC IP
+# ---------------------------------------------------------------
+
+function Public-IP {
+
+Write-Host ""
+Write-Host "PUBLIC IP ADDRESS"
+
+Invoke-RestMethod ifconfig.me
+
+}
+
+# ---------------------------------------------------------------
+# FIREWALL STATUS
+# ---------------------------------------------------------------
+
+function Firewall-Status {
+
+Get-NetFirewallProfile |
+Select Name,Enabled
+
+}
+
+# ---------------------------------------------------------------
+# ACTIVE NETWORK CONNECTIONS
+# ---------------------------------------------------------------
+
+function Net-Connections {
+
+netstat -ano
+
+}
+
+# ---------------------------------------------------------------
+# USER ACCOUNTS
+# ---------------------------------------------------------------
+
+function User-Accounts {
+
+Get-LocalUser
+
+}
+
+# ---------------------------------------------------------------
+# EVENT LOG VIEW
+# ---------------------------------------------------------------
+
+function Event-Logs {
+
+Get-EventLog -LogName System -Newest 20
+
+}
+
+# ---------------------------------------------------------------
+# SERVICES STOP TOOL
+# ---------------------------------------------------------------
+
+function Stop-ServiceTool {
+
+$name = Read-Host "Enter Service Name"
+
+Stop-Service $name
+
+}
+
+# ---------------------------------------------------------------
+# PROCESS KILL TOOL
+# ---------------------------------------------------------------
+
+function Kill-Process {
+
+$name = Read-Host "Enter Process Name"
+
+Stop-Process -Name $name -Force
+
+}
+
+# ---------------------------------------------------------------
+# NETWORK ADAPTERS
+# ---------------------------------------------------------------
+
+function Network-Adapters {
+
+Get-NetAdapter |
+Select Name,Status,MacAddress
+
+}
+
+# ---------------------------------------------------------------
+# DNS CACHE VIEW
+# ---------------------------------------------------------------
+
+function DNS-Cache {
+
+ipconfig /displaydns
+
+}
+
+# ---------------------------------------------------------------
+# HOSTNAME
+# ---------------------------------------------------------------
+
+function Show-Hostname {
+
+hostname
+
+}
+
+# ---------------------------------------------------------------
+# TIME INFORMATION
+# ---------------------------------------------------------------
+
+function Time-Info {
+
+Get-Date
+
+}
+
+# ---------------------------------------------------------------
+# MAIN MENU
+# ---------------------------------------------------------------
 
 function Main-Menu {
 
 while($true){
 
 Write-Host ""
-Write-Host "================ TOOL MENU ================"
+Write-Host "================ TOOL MENU ================="
 
 Write-Host "1  - System Information"
 Write-Host "2  - Network Status"
@@ -338,7 +450,7 @@ Write-Host "6  - Network Devices"
 Write-Host "7  - Port Scan"
 Write-Host "8  - Running Services"
 Write-Host "9  - Windows Update Check"
-Write-Host "10 - System Repair (SFC)"
+Write-Host "10 - System Repair"
 Write-Host "11 - Disk Repair"
 Write-Host "12 - Network Reset"
 Write-Host "13 - Installed Programs"
@@ -346,62 +458,64 @@ Write-Host "14 - Install Software"
 Write-Host "15 - CPU Monitor"
 Write-Host "16 - RAM Monitor"
 Write-Host "17 - Ping Test"
+Write-Host "18 - Public IP"
+Write-Host "19 - Firewall Status"
+Write-Host "20 - Active Connections"
+Write-Host "21 - User Accounts"
+Write-Host "22 - Event Logs"
+Write-Host "23 - Stop Service"
+Write-Host "24 - Kill Process"
+Write-Host "25 - Network Adapters"
+Write-Host "26 - DNS Cache"
+Write-Host "27 - Hostname"
+Write-Host "28 - System Time"
 Write-Host "0  - Exit"
 
-Write-Host "==========================================="
-
-$choice = Read-Host "Select Option"
+$choice = Read-Host "Select option"
 
 switch($choice){
 
 1 { System-Info }
-
 2 { Network-Status }
-
 3 { Internet-SpeedTest }
-
 4 { Disk-Info }
-
 5 { Process-List }
-
 6 { Network-Devices }
-
 7 { Port-Scan }
-
 8 { Running-Services }
-
 9 { Check-WindowsUpdate }
-
 10 { System-Repair }
-
 11 { Disk-Repair }
-
 12 { Network-Reset }
-
 13 { Installed-Programs }
-
 14 { Install-Tools }
-
 15 { CPU-Monitor }
-
 16 { RAM-Monitor }
-
 17 { Ping-Test }
-
+18 { Public-IP }
+19 { Firewall-Status }
+20 { Net-Connections }
+21 { User-Accounts }
+22 { Event-Logs }
+23 { Stop-ServiceTool }
+24 { Kill-Process }
+25 { Network-Adapters }
+26 { DNS-Cache }
+27 { Show-Hostname }
+28 { Time-Info }
 0 { break }
 
-}
+default { Write-Host "Invalid option" }
 
 }
 
 }
 
-# ------------------------------------------------
+}
+
+# ---------------------------------------------------------------
 # SCRIPT START
-# ------------------------------------------------
+# ---------------------------------------------------------------
 
 Show-Banner
-System-Info
-Network-Status
-Internet-SpeedTest
 Main-Menu
