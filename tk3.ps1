@@ -1,79 +1,137 @@
-# =========================================
-# PowerShell Network Monitoring Toolkit
-# Logs saved in Documents folder
-# =========================================
+# ================================
+# PowerShell Network Monitor
+# ================================
 
-$logFolder = "$env:USERPROFILE\Documents\NetworkMonitor"
-$logFile = "$logFolder\network_data.csv"
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms.DataVisualization
 
-$server = "8.8.8.8"
-$speedThreshold = 20
+$basePath = "$env:USERPROFILE\Documents\NetworkMonitor"
+$csv = "$basePath\data.csv"
+$html = "$basePath\dashboard.html"
 
-# Create folder
-if (!(Test-Path $logFolder)) {
-    New-Item -ItemType Directory -Path $logFolder | Out-Null
+if (!(Test-Path $basePath)) {
+    New-Item -ItemType Directory $basePath | Out-Null
 }
 
-# Create CSV
-if (!(Test-Path $logFile)) {
-    "Date,Time,Download,Upload,Latency,PacketLoss" | Out-File $logFile
+if (!(Test-Path $csv)) {
+    "Date,Time,Download,Upload,Latency" | Out-File $csv
 }
 
-function Get-SpeedTest {
+$server="8.8.8.8"
+$speedThreshold=20
 
-    $result = speedtest --simple
+function Get-Speed {
 
-    $download = ($result | Select-String "Download").ToString().Split(" ")[1]
-    $upload = ($result | Select-String "Upload").ToString().Split(" ")[1]
+    $json = speedtest -f json | ConvertFrom-Json
+
+    $download=[math]::Round($json.download.bandwidth/125000,2)
+    $upload=[math]::Round($json.upload.bandwidth/125000,2)
 
     return @($download,$upload)
 }
 
-function Get-PingStats {
+function Get-Ping {
 
-    $ping = Test-Connection $server -Count 4
-
-    $latency = ($ping | Measure-Object ResponseTime -Average).Average
-    $loss = (4 - $ping.Count)
-
-    return @($latency,$loss)
+    $ping=Test-Connection $server -Count 4
+    return ($ping | Measure-Object ResponseTime -Average).Average
 }
 
-function Run-Monitor {
+function Send-Alert($speed){
 
-    $date = Get-Date -Format "yyyy-MM-dd"
-    $time = Get-Date -Format "HH:mm:ss"
+$smtp="smtp.gmail.com"
 
-    $speed = Get-SpeedTest
-    $download = $speed[0]
-    $upload = $speed[1]
-
-    $pingStats = Get-PingStats
-    $latency = $pingStats[0]
-    $loss = $pingStats[1]
-
-    "$date,$time,$download,$upload,$latency,$loss" | Add-Content $logFile
-
-    Write-Host "Download: $download Mbps | Upload: $upload Mbps | Ping: $latency ms"
+Send-MailMessage `
+-To "admin@email.com" `
+-From "monitor@email.com" `
+-Subject "Internet Speed Alert" `
+-Body "Speed dropped to $speed Mbps" `
+-SmtpServer $smtp
 }
 
-while ($true) {
+function Update-HTML {
 
-    $now = Get-Date
-    $start = Get-Date -Hour 8 -Minute 45 -Second 0
-    $end = Get-Date -Hour 9 -Minute 0 -Second 0
+$data=Import-Csv $csv | Select-Object -Last 20
 
-    if ($now -ge $start -and $now -le $end) {
+$htmlContent=@"
+<html>
+<head>
+<title>Network Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
 
-        for ($i=1;$i -le 10;$i++) {
+<body>
 
-            Run-Monitor
+<h2>Network Speed Dashboard</h2>
 
-            Start-Sleep -Seconds 90
-        }
+<canvas id="speedChart"></canvas>
 
-        Start-Sleep -Seconds 86400
-    }
+<script>
 
-    Start-Sleep -Seconds 60
+var ctx=document.getElementById('speedChart');
+
+var chart=new Chart(ctx,{
+type:'line',
+data:{
+labels:[ $(($data.Time -join "','") -replace "^","'" -replace "$","'") ],
+datasets:[
+{
+label:'Download Mbps',
+data:[ $($data.Download -join ",") ]
+},
+{
+label:'Upload Mbps',
+data:[ $($data.Upload -join ",") ]
 }
+]
+}
+});
+
+</script>
+
+</body>
+</html>
+"@
+
+$htmlContent | Out-File $html
+}
+
+function Run-Test {
+
+$date=Get-Date -Format "yyyy-MM-dd"
+$time=Get-Date -Format "HH:mm:ss"
+
+$s=Get-Speed
+$d=$s[0]
+$u=$s[1]
+
+$lat=Get-Ping
+
+"$date,$time,$d,$u,$lat" | Add-Content $csv
+
+if($d -lt $speedThreshold){
+Send-Alert $d
+}
+
+Update-HTML
+
+Write-Host "Download:$d Upload:$u Ping:$lat"
+}
+
+# GUI
+$form=New-Object Windows.Forms.Form
+$form.Text="Network Monitor"
+$form.Width=300
+$form.Height=200
+
+$btn=New-Object Windows.Forms.Button
+$btn.Text="Run Speed Test"
+$btn.Width=200
+$btn.Height=40
+$btn.Top=50
+$btn.Left=40
+
+$btn.Add_Click({Run-Test})
+
+$form.Controls.Add($btn)
+
+$form.ShowDialog()
